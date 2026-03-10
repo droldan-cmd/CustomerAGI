@@ -334,7 +334,7 @@ const MountainTracker = () => {
     return (
         <div className="w-full h-full relative bg-[#0d1117] rounded-[2rem] border border-white/5 overflow-hidden">
             <Canvas dpr={[1, 2]} gl={{ antialias: true }}>
-                <PerspectiveCamera makeDefault position={[5, 4, 7]} fov={40} />
+                <PerspectiveCamera makeDefault position={[8, 6, 10]} fov={35} />
 
                 {/* Lighting */}
                 <ambientLight intensity={0.6} />
@@ -344,12 +344,15 @@ const MountainTracker = () => {
                 <React.Suspense fallback={null}>
                     {/* Rotate the Z-up geometry so it points UP on the global Y axis */}
                     <group rotation={[-Math.PI / 2, 0, 0]}>
-                        <MountainTerrain />
-                        
-                        {/* Agent pins */}
-                        {mountainAgents.map((agent, i) => (
-                            <AgentPin key={agent.name} agent={agent} index={i} total={mountainAgents.length} />
-                        ))}
+                        {/* Scale down to prevent clipping the card edges */}
+                        <group scale={0.75}>
+                            <MountainTerrain />
+                            
+                            {/* Agent pins */}
+                            {mountainAgents.map((agent, i) => (
+                                <AgentPin key={agent.name} agent={agent} index={i} total={mountainAgents.length} />
+                            ))}
+                        </group>
                     </group>
 
                     {/* User orbit control - rotates the camera around the Y axis */}
@@ -363,7 +366,7 @@ const MountainTracker = () => {
                     />
                 </React.Suspense>
 
-                <fog attach="fog" args={['#0d1117', 8, 22]} />
+                <fog attach="fog" args={['#0d1117', 10, 25]} />
             </Canvas>
         </div>
     );
