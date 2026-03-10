@@ -128,6 +128,51 @@ export const KnowledgeBase: React.FC = () => {
         }
     };
 
+    const updateNotesInN8n = async (documentId: string, notes: string[]) => {
+        try {
+            const notas_contexto = notes.map(n => `- ${n}`).join('\n');
+            const response = await fetch('https://n8n-n8n.rcnvtl.easypanel.host/webhook-test/actualizar-notas-pdf', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    document_id: documentId,
+                    tenant_id: '1',
+                    notas_contexto
+                }),
+            });
+            if (!response.ok) {
+                console.error("Failed to update notes in N8N");
+            }
+        } catch (error) {
+            console.error("Error updating notes in N8N:", error);
+        }
+    };
+
+    const handleDeleteSource = async (documentId: string) => {
+        try {
+            const response = await fetch('https://n8n-n8n.rcnvtl.easypanel.host/webhook-test/borrar-pdf-seguro', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    document_id: documentId,
+                    tenant_id: '1'
+                }),
+            });
+            if (response.ok) {
+                setDataSources(prev => prev.filter(s => s.id !== documentId));
+                setIsManageSourceOpen(false);
+            } else {
+                console.error("Failed to delete document in N8N");
+            }
+        } catch (error) {
+            console.error("Error deleting document in N8N:", error);
+        }
+    };
+
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
@@ -195,16 +240,17 @@ export const KnowledgeBase: React.FC = () => {
     const handleSendNote = () => {
         if (!aiNote.trim()) return;
 
+        const newNotes = [...chatNotes, { id: Date.now(), text: aiNote, time: "Just now" }];
+
         if (selectedDocument) {
             const confirmSync = window.confirm("Sync Knowledge Base with this note?");
             if (confirmSync) {
-                setChatNotes([...chatNotes, { id: Date.now(), text: aiNote, time: "Just now" }]);
-                // Trigger secondary upload mapping the file and new notes to the webhook
-                uploadToN8n(selectedDocument.file, selectedDocument.documentId, aiNote);
+                setChatNotes(newNotes);
+                updateNotesInN8n(selectedDocument.documentId, newNotes.map(n => n.text));
             }
         } else {
             // Mock fallback if no document is dynamically uploaded
-            setChatNotes([...chatNotes, { id: Date.now(), text: aiNote, time: "Just now" }]);
+            setChatNotes(newNotes);
         }
 
         setAiNote('');
@@ -402,7 +448,7 @@ export const KnowledgeBase: React.FC = () => {
                                                 >
                                                     Manage <ChevronRight size={14} strokeWidth={3} />
                                                 </button>
-                                                <button onClick={() => setDataSources(dataSources.filter((s: DataSource) => s.id !== source.id))} className="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 bg-slate-50 dark:bg-slate-800 rounded-xl transition-all border border-slate-100 dark:border-slate-700"><Trash2 size={18} /></button>
+                                                <button onClick={() => handleDeleteSource(source.id)} className="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 bg-slate-50 dark:bg-slate-800 rounded-xl transition-all border border-slate-100 dark:border-slate-700"><Trash2 size={18} /></button>
                                             </div>
                                         </div>
                                     </div>
@@ -444,7 +490,7 @@ export const KnowledgeBase: React.FC = () => {
                                             >
                                                 Manage <ChevronRight size={14} strokeWidth={3} />
                                             </button>
-                                            <button onClick={() => setDataSources(dataSources.filter((s: DataSource) => s.id !== source.id))} className="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 bg-slate-50 dark:bg-slate-800 rounded-xl transition-all border border-slate-100 dark:border-slate-700"><Trash2 size={18} /></button>
+                                            <button onClick={() => handleDeleteSource(source.id)} className="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 bg-slate-50 dark:bg-slate-800 rounded-xl transition-all border border-slate-100 dark:border-slate-700"><Trash2 size={18} /></button>
                                         </div>
                                     </div>
                                 </div>
@@ -674,7 +720,7 @@ export const KnowledgeBase: React.FC = () => {
                             <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2 text-center leading-tight">{selectedDocument ? selectedDocument.name : "Company_Policy_2024.pdf"}</h3>
                             <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700 mb-10">Indexed</span>
 
-                            <button className="w-full py-3.5 bg-red-50 text-red-600 hover:bg-red-500 hover:text-white dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-600 dark:hover:text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2">
+                            <button onClick={() => selectedDocument && handleDeleteSource(selectedDocument.documentId)} className="w-full py-3.5 bg-red-50 text-red-600 hover:bg-red-500 hover:text-white dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-600 dark:hover:text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2">
                                 <Trash2 size={18} /> Delete Source
                             </button>
                         </div>
@@ -697,7 +743,11 @@ export const KnowledgeBase: React.FC = () => {
                                         <p className="text-sm text-slate-700 dark:text-slate-300 pr-8">{note.text}</p>
                                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-3 block">{note.time}</span>
                                         <button
-                                            onClick={() => setChatNotes(chatNotes.filter(n => n.id !== note.id))}
+                                            onClick={() => {
+                                                const newNotes = chatNotes.filter(n => n.id !== note.id);
+                                                setChatNotes(newNotes);
+                                                if (selectedDocument) updateNotesInN8n(selectedDocument.documentId, newNotes.map(n => n.text));
+                                            }}
                                             className="absolute top-4 right-4 p-1.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all rounded-md hover:bg-red-50 dark:hover:bg-red-900/20"
                                         >
                                             <Trash2 size={14} />
