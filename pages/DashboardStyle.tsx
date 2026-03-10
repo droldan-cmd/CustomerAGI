@@ -104,26 +104,25 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 // Extracted Complex Charts
 const MountainTracker = () => {
     // Generate topographical layers for a 3D isometric mountain effect
-    const layers = 20;
+    const layers = 15;
     const generateTopography = () => {
         let paths = [];
         for (let i = 0; i < layers; i++) {
+            // As i increases, the layer gets higher (smaller width/height, shifted up slightly)
             const scale = 1 - (i / layers);
-            const yOffset = 250 - (i * 10);
+            const yOffset = 250 - (i * 12);
             
+            // Generate some jagged points representing the contour of the mountain at this elevation
             const points = [];
-            const numPoints = 50 + Math.floor(scale * 20); // More points for smoother organic curves
+            const numPoints = 12 + Math.floor(scale * 10);
             for (let j = 0; j <= numPoints; j++) {
                 const angle = (j / numPoints) * Math.PI * 2;
+                // Base radius shrinks as we go up
+                const baseRadiusX = 200 * scale;
+                const baseRadiusY = 80 * scale;
                 
-                const baseRadiusX = 220 * scale;
-                const baseRadiusY = 110 * scale;
-                
-                // Add organic noise for realistic ridges
-                const noise = 1 
-                            + (Math.sin(angle * 3 + i) * 0.1) 
-                            + (Math.cos(angle * 7 - i * 0.5) * 0.05)
-                            + (Math.sin(angle * 12 + i * 2) * 0.02);
+                // Add some noise/jaggedness
+                const noise = 1 + (Math.sin(angle * 5 + i) * 0.15) + (Math.cos(angle * 3 - i) * 0.1);
                 
                 const rX = baseRadiusX * noise;
                 const rY = baseRadiusY * noise;
@@ -139,7 +138,7 @@ const MountainTracker = () => {
                     d={points.join(' ') + ' Z'} 
                     fill={`rgba(30, 41, 59, ${0.4 + (i * 0.02)})`} 
                     stroke="rgba(255, 255, 255, 0.2)" 
-                    strokeWidth="1.2"
+                    strokeWidth="1.5"
                 />
             );
         }
@@ -147,8 +146,8 @@ const MountainTracker = () => {
     };
 
     return (
-        <div className="w-full h-full relative overflow-hidden bg-slate-900/40 rounded-xl border border-white/5 flex items-end justify-center perspective-[1200px]">
-            <svg className="w-full h-full animate-[spinYRight_40s_linear_infinite]" viewBox="0 0 500 350" preserveAspectRatio="xMidYMid slice" style={{ transformStyle: 'preserve-3d' }}>
+        <div className="w-full h-full relative overflow-hidden bg-slate-900/40 rounded-xl border border-white/5 flex items-end justify-center perspective-1000">
+            <svg className="w-full h-full" viewBox="0 0 500 350" preserveAspectRatio="xMidYMid slice">
                 <GlowFilter />
                 
                 {/* Topographic Map Layers */}
@@ -259,17 +258,11 @@ export const DashboardStyle: React.FC = () => {
         setShowGraphModal(false);
     };
 
-    const WidgetWrapper = ({ id, title, children, isKpi = false, glowColor }: any) => {
+    const WidgetWrapper = ({ id, title, children, isKpi = false }: any) => {
         return (
-            <div className={`w-full h-full rounded-[2rem] border relative group transition-colors duration-300 overflow-hidden
+            <div className={`w-full h-full rounded-[2rem] border relative group transition-colors duration-300
                 ${isDarkMode ? 'bg-[#10141d]/80 border-white/5 shadow-2xl shadow-black/50 backdrop-blur-md' : 'bg-white border-slate-200 shadow-xl'}`}>
                 
-                {/* Background predominant glow */}
-                {glowColor && isDarkMode && (
-                    <div className="absolute inset-x-0 bottom-[-20%] w-full h-3/4 rounded-full blur-[90px] pointer-events-none opacity-25 mix-blend-screen"
-                         style={{ backgroundColor: glowColor }}></div>
-                )}
-
                 {/* Header (Hidden until hover) */}
                 <div className={`absolute top-0 left-0 right-0 h-10 px-4 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity z-10 rounded-t-[2rem]
                     ${isDarkMode ? 'bg-gradient-to-b from-[#1c212c] to-transparent' : 'bg-gradient-to-b from-slate-100 to-transparent'}`}>
@@ -320,14 +313,14 @@ export const DashboardStyle: React.FC = () => {
         switch(id) {
             case 'chart_trend':
                 return (
-                    <WidgetWrapper id={id} title="Conversations Over Time" glowColor="#55b7e0">
+                    <WidgetWrapper id={id} title="Conversations Over Time">
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={conversationsData}>
                                 <GlowFilter />
                                 <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#334155" : "#e2e8f0"} vertical={false} />
                                 <XAxis dataKey="day" hide />
                                 <YAxis hide />
-                                <RechartsTooltip content={<CustomTooltip />} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
+                                <RechartsTooltip content={<CustomTooltip />} />
                                 <Area type="monotone" dataKey="count" stroke="#55b7e0" strokeWidth={3} fill="url(#areaGrad)" filter="url(#neonGlow)" />
                             </AreaChart>
                         </ResponsiveContainer>
@@ -341,13 +334,13 @@ export const DashboardStyle: React.FC = () => {
                 );
             case 'chart_sentiment':
                 return (
-                    <WidgetWrapper id={id} title="Sentiment Analysis Trends" glowColor="#10b981">
+                    <WidgetWrapper id={id} title="Sentiment Analysis Trends">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={sentimentData}>
                                 <GlowFilter />
                                 <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#334155" : "#e2e8f0"} vertical={false} opacity={0.5}/>
                                 <XAxis dataKey="time" hide />
-                                <RechartsTooltip content={<CustomTooltip />} cursor={{fill: 'rgba(255,255,255,0.05)'}}/>
+                                <RechartsTooltip content={<CustomTooltip />} />
                                 <Line type="monotone" dataKey="positive" stroke="#10b981" strokeWidth={3} dot={{r: 4}} filter="url(#neonGlow)" />
                                 <Line type="monotone" dataKey="negative" stroke="#f43f5e" strokeWidth={3} dot={{r: 4}} filter="url(#neonGlow)" />
                                 <Line type="monotone" dataKey="neutral" stroke="#8b5cf6" strokeWidth={3} dot={{r: 4}} filter="url(#neonGlow)" />
@@ -357,24 +350,23 @@ export const DashboardStyle: React.FC = () => {
                 );
             case 'chart_human_ai':
                 return (
-                    <WidgetWrapper id={id} title="Human vs. AI Intervention" glowColor="#fab728">
+                    <WidgetWrapper id={id} title="Human vs. AI Intervention">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={humanVsAiData}>
-                                <GlowFilter />
-                                <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#334155" : "#e2e8f0"} vertical={false} opacity={0.3} />
-                                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} />
-                                <YAxis hide />
-                                <RechartsTooltip content={<CustomTooltip />} cursor={{fill: 'rgba(255,255,255,0.05)'}}/>
+                            <BarChart data={humanVsAiData} layout="vertical">
+                                <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#334155" : "#e2e8f0"} horizontal={false} opacity={0.5} />
+                                <XAxis type="number" hide />
+                                <YAxis dataKey="day" type="category" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} width={40} />
+                                <RechartsTooltip content={<CustomTooltip />} />
                                 <Legend wrapperStyle={{fontSize: '10px'}} />
-                                <Bar dataKey="ai" name="AI Handled" fill="#55b7e0" radius={[10, 10, 10, 10]} barSize={10} filter="url(#neonGlow)" />
-                                <Bar dataKey="human" name="Human Escalated" fill="#fab728" radius={[10, 10, 10, 10]} barSize={10} filter="url(#neonGlow)" />
+                                <Bar dataKey="ai" name="AI Handled" stackId="a" fill="#55b7e0" radius={[0, 0, 0, 0]} />
+                                <Bar dataKey="human" name="Human Escalated" stackId="a" fill="#fab728" radius={[0, 4, 4, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </WidgetWrapper>
                 );
             case 'chart_radar':
                 return (
-                    <WidgetWrapper id={id} title="Agent Performance Matrix" glowColor="#8b5cf6">
+                    <WidgetWrapper id={id} title="Agent Performance Matrix">
                         <ResponsiveContainer width="100%" height="100%">
                             <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
                                 <PolarGrid stroke={isDarkMode ? "#334155" : "#e2e8f0"} />
@@ -387,7 +379,7 @@ export const DashboardStyle: React.FC = () => {
                 );
             case 'chart_topics':
                 return (
-                    <WidgetWrapper id={id} title="Top Resolution Topics" glowColor="#f43f5e">
+                    <WidgetWrapper id={id} title="Top Resolution Topics">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <GlowFilter />
@@ -466,7 +458,6 @@ export const DashboardStyle: React.FC = () => {
                 {/* Background ambient glow */}
                 {isDarkMode && <div className="absolute top-1/4 left-1/4 w-[800px] h-[800px] bg-[#55b7e0]/5 rounded-full blur-[120px] pointer-events-none -z-10"></div>}
 
-                {/* @ts-ignore - draggableHandle is valid but missing from ResponsiveGridLayout typedefs */}
                 {/* @ts-ignore - draggableHandle is valid but missing from ResponsiveGridLayout typedefs */}
                 <ResponsiveGridLayout
                     className="layout"
@@ -575,10 +566,6 @@ export const DashboardStyle: React.FC = () => {
             {/* Custom CSS for standardizing the draggable look and glowing animations */}
             <style>
                 {`
-                    @keyframes spinYRight {
-                        from { transform: rotateY(0deg); }
-                        to { transform: rotateY(360deg); }
-                    }
                     .react-grid-item > .react-resizable-handle::after {
                         border-right: 2px solid #55b7e0;
                         border-bottom: 2px solid #55b7e0;
