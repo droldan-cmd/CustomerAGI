@@ -102,44 +102,107 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 // Extracted Complex Charts
-const MountainTracker = () => (
-    <div className="w-full h-full relative overflow-hidden bg-slate-900/40 rounded-xl border border-white/5 flex items-end justify-center perspective-1000">
-        <svg className="w-full h-full" viewBox="0 0 500 300" preserveAspectRatio="none">
-            <GlowFilter />
-            {/* Topographic Lines/Wireframe Base */}
-            {[...Array(8)].map((_, i) => (
-                <ellipse key={`el-${i}`} cx="250" cy={250 - (i * 10)} rx={200 - (i * 20)} ry={60 - (i * 5)} 
-                    fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
-            ))}
+const MountainTracker = () => {
+    // Generate topographical layers for a 3D isometric mountain effect
+    const layers = 15;
+    const generateTopography = () => {
+        let paths = [];
+        for (let i = 0; i < layers; i++) {
+            // As i increases, the layer gets higher (smaller width/height, shifted up slightly)
+            const scale = 1 - (i / layers);
+            const yOffset = 250 - (i * 12);
             
-            {/* The Mountain Peak Area */}
-            <path d="M50 250 Q150 230 250 50 Q350 230 450 250 Z" 
-                fill="url(#areaGrad)" stroke="#55b7e0" strokeWidth="2" filter="url(#neonGlow)" />
+            // Generate some jagged points representing the contour of the mountain at this elevation
+            const points = [];
+            const numPoints = 12 + Math.floor(scale * 10);
+            for (let j = 0; j <= numPoints; j++) {
+                const angle = (j / numPoints) * Math.PI * 2;
+                // Base radius shrinks as we go up
+                const baseRadiusX = 200 * scale;
+                const baseRadiusY = 80 * scale;
                 
-            {/* Route Dashed Line */}
-            <path d="M100 240 Q180 150 250 50" fill="none" stroke="white" strokeWidth="2" strokeDasharray="5,5" opacity="0.6"/>
+                // Add some noise/jaggedness
+                const noise = 1 + (Math.sin(angle * 5 + i) * 0.15) + (Math.cos(angle * 3 - i) * 0.1);
+                
+                const rX = baseRadiusX * noise;
+                const rY = baseRadiusY * noise;
+                
+                const px = 250 + (Math.cos(angle) * rX);
+                const py = yOffset + (Math.sin(angle) * rY);
+                
+                points.push(`${j === 0 ? 'M' : 'L'} ${px} ${py}`);
+            }
+            paths.push(
+                <path 
+                    key={`topo-${i}`} 
+                    d={points.join(' ') + ' Z'} 
+                    fill={`rgba(30, 41, 59, ${0.4 + (i * 0.02)})`} 
+                    stroke="rgba(255, 255, 255, 0.2)" 
+                    strokeWidth="1.5"
+                />
+            );
+        }
+        return paths;
+    };
 
-            {/* Agent Pins */}
-            {mountainAgents.map((agent, i) => {
-                // Approximate pin position based on score (100 = Peak 250,50 ; 0 = Base 100,240)
-                const heightRatio = agent.score / 100;
-                const topY = 50; const baseY = 240;
-                const topX = 250; const baseX = 100;
-                const cx = baseX + (topX - baseX) * heightRatio;
-                const cy = baseY - (baseY - topY) * heightRatio;
+    return (
+        <div className="w-full h-full relative overflow-hidden bg-slate-900/40 rounded-xl border border-white/5 flex items-end justify-center perspective-1000">
+            <svg className="w-full h-full" viewBox="0 0 500 350" preserveAspectRatio="xMidYMid slice">
+                <GlowFilter />
+                
+                {/* Topographic Map Layers */}
+                <g className="topography">
+                    {generateTopography()}
+                </g>
 
-                return (
-                    <g key={agent.name} className="group relative cursor-pointer">
-                        <circle cx={cx} cy={cy} r="6" fill="#1e293b" stroke={agent.color} strokeWidth="3" filter="url(#neonGlow)" />
-                        <line x1={cx} y1={cy} x2={cx} y2={cy-30} stroke={agent.color} strokeWidth="2" />
-                        <circle cx={cx} cy={cy-30} r="12" fill={agent.color} filter="url(#neonGlow)" />
-                        <text x={cx} y={cy-26} fontSize="10" fill="white" textAnchor="middle" fontWeight="bold">{agent.score}</text>
-                    </g>
-                );
-            })}
-        </svg>
-    </div>
-);
+                {/* Route Dashed Line winding up the mountain */}
+                <path d="M120 280 C180 250, 160 200, 220 180 C260 160, 240 120, 245 70" 
+                      fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth="2.5" strokeDasharray="6,4" />
+
+                {/* Agent Pins */}
+                {mountainAgents.reverse().map((agent, index) => { // Reverse so higher scores render on top
+                    // Calculate visual position on the isometric mountain
+                    // Peak is roughly at (245, 70), Base is roughly at (120, 280) mapping along the curved route
+                    const scoreRatio = agent.score / 100;
+                    
+                    // Simple path interpolation for the pins
+                    const startX = 120, startY = 280;
+                    const endX = 245, endY = 70;
+                    
+                    // Add some curve/variance so they don't sit in a straight line
+                    const cx = startX + ((endX - startX) * scoreRatio) + (Math.sin(scoreRatio * Math.PI) * 40);
+                    const cy = startY - ((startY - endY) * scoreRatio);
+                    
+                    const pinHeight = 35 + (agent.score * 0.1); // Higher scores get slightly taller pins
+
+                    return (
+                        <g key={agent.name} className="group cursor-pointer hover:opacity-100 transition-opacity">
+                            {/* Pin Stick */}
+                            <line x1={cx} y1={cy} x2={cx} y2={cy - pinHeight} stroke={agent.color} strokeWidth="2" opacity="0.8" />
+                            {/* Base connecting circle */}
+                            <ellipse cx={cx} cy={cy} rx="8" ry="4" fill="transparent" stroke={agent.color} strokeWidth="1.5" opacity="0.6" />
+                            <circle cx={cx} cy={cy} r="2" fill={agent.color} />
+                            
+                            {/* Pin Head (Glowing Circle) */}
+                            <circle cx={cx} cy={cy - pinHeight} r="14" fill="#1e293b" stroke={agent.color} strokeWidth="2" filter="url(#neonGlow)" />
+                            
+                            {/* Icon / Number in Pin */}
+                            <text x={cx} y={cy - pinHeight + 4} fontSize="11" fill="white" textAnchor="middle" fontWeight="bold">
+                                {agent.score}
+                            </text>
+
+                            {/* Hover Tooltip (SVG based for z-index containment) */}
+                            <g className="opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                <rect x={cx - 50} y={cy - pinHeight - 35} width="100" height="20" rx="4" fill="#0f172a" fillOpacity="0.9" stroke="rgba(255,255,255,0.1)"/>
+                                <text x={cx} y={cy - pinHeight - 21} fontSize="10" fill="white" textAnchor="middle">{agent.name}</text>
+                            </g>
+                        </g>
+                    );
+                })}
+            </svg>
+        </div>
+    );
+};
 
 // --- Main Component ---
 
@@ -395,6 +458,7 @@ export const DashboardStyle: React.FC = () => {
                 {/* Background ambient glow */}
                 {isDarkMode && <div className="absolute top-1/4 left-1/4 w-[800px] h-[800px] bg-[#55b7e0]/5 rounded-full blur-[120px] pointer-events-none -z-10"></div>}
 
+                {/* @ts-ignore - draggableHandle is valid but missing from ResponsiveGridLayout typedefs */}
                 <ResponsiveGridLayout
                     className="layout"
                     layouts={layouts}
