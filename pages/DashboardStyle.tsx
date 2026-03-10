@@ -205,20 +205,12 @@ const ContourRing = ({ height, radius }: { height: number; radius: number }) => 
 };
 
 const MountainTerrain = () => {
-    const groupRef = React.useRef<THREE.Group>(null);
     const geoRef = React.useRef<THREE.BufferGeometry | null>(null);
 
     // Build geometry once
     if (!geoRef.current) {
         geoRef.current = buildMountainGeometry();
     }
-
-    // Slow auto-rotation
-    useFrame(() => {
-        if (groupRef.current) {
-            groupRef.current.rotation.z += 0.003;
-        }
-    });
 
     // Generate contour rings at various heights
     const contours = React.useMemo(() => {
@@ -236,7 +228,7 @@ const MountainTerrain = () => {
     }, []);
 
     return (
-        <group ref={groupRef}>
+        <group>
             {/* The actual terrain mesh */}
             <mesh geometry={geoRef.current} rotation={[0, 0, 0]}>
                 <meshStandardMaterial
@@ -342,7 +334,7 @@ const MountainTracker = () => {
     return (
         <div className="w-full h-full relative bg-[#0d1117] rounded-[2rem] border border-white/5 overflow-hidden">
             <Canvas dpr={[1, 2]} gl={{ antialias: true }}>
-                <PerspectiveCamera makeDefault position={[6, -5, 7]} fov={40} />
+                <PerspectiveCamera makeDefault position={[5, 4, 7]} fov={40} />
 
                 {/* Lighting */}
                 <ambientLight intensity={0.6} />
@@ -350,22 +342,24 @@ const MountainTracker = () => {
                 <pointLight position={[-3, -3, 6]} intensity={0.4} color="#55b7e0" />
 
                 <React.Suspense fallback={null}>
-                    {/* Mountain terrain (auto-rotates) */}
-                    <MountainTerrain />
+                    {/* Rotate the Z-up geometry so it points UP on the global Y axis */}
+                    <group rotation={[-Math.PI / 2, 0, 0]}>
+                        <MountainTerrain />
+                        
+                        {/* Agent pins */}
+                        {mountainAgents.map((agent, i) => (
+                            <AgentPin key={agent.name} agent={agent} index={i} total={mountainAgents.length} />
+                        ))}
+                    </group>
 
-                    {/* Agent pins (rotate with the mountain via being children of the scene) */}
-                    {mountainAgents.map((agent, i) => (
-                        <AgentPin key={agent.name} agent={agent} index={i} total={mountainAgents.length} />
-                    ))}
-
-                    {/* User orbit control */}
+                    {/* User orbit control - rotates the camera around the Y axis */}
                     <OrbitControls
                         enableZoom={false}
                         enablePan={false}
                         minPolarAngle={Math.PI / 6}
                         maxPolarAngle={Math.PI / 2.2}
                         autoRotate
-                        autoRotateSpeed={0.6}
+                        autoRotateSpeed={0.8}
                     />
                 </React.Suspense>
 
