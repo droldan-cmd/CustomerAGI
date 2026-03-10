@@ -60,12 +60,30 @@ const radarData = [
 ];
 
 const mountainAgents = [
-    { name: 'Support Bot', score: 98, color: '#10b981' }, // Peak
+    { name: 'Support Bot', score: 98, color: '#10b981' },
     { name: 'Sales Agent', score: 75, color: '#55b7e0' },
     { name: 'FAQ Helper', score: 62, color: '#8b5cf6' },
     { name: 'Billing Bot', score: 40, color: '#fab728' },
-    { name: 'Onboarding AI', score: 25, color: '#f43f5e' } // Base
+    { name: 'Onboarding AI', score: 25, color: '#f43f5e' }
 ];
+
+const agents = ['Support Bot', 'Sales Agent', 'Onboarding AI', 'Billing Bot', 'FAQ Helper'];
+const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const heatmapData = agents.map(agent => ({
+    agent,
+    data: daysOfWeek.map(day => ({
+        day,
+        value: Math.floor(Math.random() * 100),
+    })),
+}));
+const getHeatmapColor = (value: number): string => {
+    if (value < 15) return '#1e293b';
+    if (value < 30) return '#1a3a4a';
+    if (value < 50) return '#1a5066';
+    if (value < 70) return '#2a7a99';
+    if (value < 85) return '#55b7e0';
+    return '#7dd3fc';
+};
 
 // --- Sub-Components ---
 
@@ -103,102 +121,99 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 // Extracted Complex Charts
 const MountainTracker = () => {
-    // Generate topographical layers for a 3D isometric mountain effect
-    const layers = 15;
-    const generateTopography = () => {
+    const layers = 18;
+    const topoLayers = React.useMemo(() => {
         let paths = [];
         for (let i = 0; i < layers; i++) {
-            // As i increases, the layer gets higher (smaller width/height, shifted up slightly)
             const scale = 1 - (i / layers);
-            const yOffset = 250 - (i * 12);
-            
-            // Generate some jagged points representing the contour of the mountain at this elevation
+            const yOffset = 260 - (i * 12);
             const points = [];
-            const numPoints = 12 + Math.floor(scale * 10);
+            const numPoints = 14 + Math.floor(scale * 12);
             for (let j = 0; j <= numPoints; j++) {
                 const angle = (j / numPoints) * Math.PI * 2;
-                // Base radius shrinks as we go up
-                const baseRadiusX = 200 * scale;
-                const baseRadiusY = 80 * scale;
-                
-                // Add some noise/jaggedness
+                const baseRX = 200 * scale;
+                const baseRY = 80 * scale;
                 const noise = 1 + (Math.sin(angle * 5 + i) * 0.15) + (Math.cos(angle * 3 - i) * 0.1);
-                
-                const rX = baseRadiusX * noise;
-                const rY = baseRadiusY * noise;
-                
-                const px = 250 + (Math.cos(angle) * rX);
-                const py = yOffset + (Math.sin(angle) * rY);
-                
+                const px = 250 + (Math.cos(angle) * baseRX * noise);
+                const py = yOffset + (Math.sin(angle) * baseRY * noise);
                 points.push(`${j === 0 ? 'M' : 'L'} ${px} ${py}`);
             }
-            paths.push(
-                <path 
-                    key={`topo-${i}`} 
-                    d={points.join(' ') + ' Z'} 
-                    fill={`rgba(30, 41, 59, ${0.4 + (i * 0.02)})`} 
-                    stroke="rgba(255, 255, 255, 0.2)" 
-                    strokeWidth="1.5"
-                />
-            );
+            paths.push({ key: `topo-${i}`, d: points.join(' ') + ' Z', opacity: 0.35 + (i * 0.03) });
         }
         return paths;
-    };
+    }, []);
+
+    // Compute pin positions (these stay fixed in 2D overlay)
+    const sortedAgents = React.useMemo(() => [...mountainAgents].sort((a, b) => a.score - b.score), []);
+    const pinPositions = React.useMemo(() => {
+        return sortedAgents.map(agent => {
+            const ratio = agent.score / 100;
+            const sx = 130, sy = 290, ex = 250, ey = 50;
+            const cx = sx + ((ex - sx) * ratio) + (Math.sin(ratio * Math.PI) * 45);
+            const cy = sy - ((sy - ey) * ratio);
+            const pinH = 35 + (agent.score * 0.12);
+            return { ...agent, cx, cy, pinH };
+        });
+    }, []);
 
     return (
-        <div className="w-full h-full relative overflow-hidden bg-slate-900/40 rounded-xl border border-white/5 flex items-end justify-center perspective-1000">
-            <svg className="w-full h-full" viewBox="0 0 500 350" preserveAspectRatio="xMidYMid slice">
-                <GlowFilter />
-                
-                {/* Topographic Map Layers */}
-                <g className="topography">
-                    {generateTopography()}
-                </g>
+        <div className="w-full h-full relative overflow-hidden rounded-xl" style={{ perspective: '800px' }}>
+            {/* 3D Rotating Mountain Body */}
+            <div className="absolute inset-0 flex items-center justify-center mountain-rotate-container" style={{ transformStyle: 'preserve-3d' }}>
+                <svg className="w-full h-full" viewBox="0 0 500 350" preserveAspectRatio="xMidYMid slice">
+                    <defs>
+                        <linearGradient id="mountainGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#55b7e0" stopOpacity={0.5} />
+                            <stop offset="100%" stopColor="#55b7e0" stopOpacity={0.05} />
+                        </linearGradient>
+                        <filter id="mountainGlow" x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur stdDeviation="4" result="blur" />
+                            <feMerge>
+                                <feMergeNode in="blur" />
+                                <feMergeNode in="SourceGraphic" />
+                            </feMerge>
+                        </filter>
+                    </defs>
 
-                {/* Route Dashed Line winding up the mountain */}
-                <path d="M120 280 C180 250, 160 200, 220 180 C260 160, 240 120, 245 70" 
-                      fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth="2.5" strokeDasharray="6,4" />
+                    {/* Topo Layers */}
+                    {topoLayers.map(layer => (
+                        <path key={layer.key} d={layer.d}
+                            fill={`rgba(20, 30, 50, ${layer.opacity})`}
+                            stroke="rgba(85, 183, 224, 0.15)"
+                            strokeWidth="1.2" />
+                    ))}
 
-                {/* Agent Pins */}
-                {mountainAgents.reverse().map((agent, index) => { // Reverse so higher scores render on top
-                    // Calculate visual position on the isometric mountain
-                    // Peak is roughly at (245, 70), Base is roughly at (120, 280) mapping along the curved route
-                    const scoreRatio = agent.score / 100;
-                    
-                    // Simple path interpolation for the pins
-                    const startX = 120, startY = 280;
-                    const endX = 245, endY = 70;
-                    
-                    // Add some curve/variance so they don't sit in a straight line
-                    const cx = startX + ((endX - startX) * scoreRatio) + (Math.sin(scoreRatio * Math.PI) * 40);
-                    const cy = startY - ((startY - endY) * scoreRatio);
-                    
-                    const pinHeight = 35 + (agent.score * 0.1); // Higher scores get slightly taller pins
+                    {/* Mountain silhouette fill */}
+                    <path d="M50 290 Q150 260 250 40 Q350 260 450 290 Z"
+                        fill="url(#mountainGrad)" stroke="#55b7e0" strokeWidth="2" filter="url(#mountainGlow)" />
 
-                    return (
-                        <g key={agent.name} className="group cursor-pointer hover:opacity-100 transition-opacity">
-                            {/* Pin Stick */}
-                            <line x1={cx} y1={cy} x2={cx} y2={cy - pinHeight} stroke={agent.color} strokeWidth="2" opacity="0.8" />
-                            {/* Base connecting circle */}
-                            <ellipse cx={cx} cy={cy} rx="8" ry="4" fill="transparent" stroke={agent.color} strokeWidth="1.5" opacity="0.6" />
-                            <circle cx={cx} cy={cy} r="2" fill={agent.color} />
-                            
-                            {/* Pin Head (Glowing Circle) */}
-                            <circle cx={cx} cy={cy - pinHeight} r="14" fill="#1e293b" stroke={agent.color} strokeWidth="2" filter="url(#neonGlow)" />
-                            
-                            {/* Icon / Number in Pin */}
-                            <text x={cx} y={cy - pinHeight + 4} fontSize="11" fill="white" textAnchor="middle" fontWeight="bold">
-                                {agent.score}
-                            </text>
+                    {/* Route Dashed Line */}
+                    <path d="M120 280 C180 250, 160 200, 220 180 C260 160, 240 120, 248 55"
+                        fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2.5" strokeDasharray="6,4" />
+                </svg>
+            </div>
 
-                            {/* Hover Tooltip (SVG based for z-index containment) */}
-                            <g className="opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                                <rect x={cx - 50} y={cy - pinHeight - 35} width="100" height="20" rx="4" fill="#0f172a" fillOpacity="0.9" stroke="rgba(255,255,255,0.1)"/>
-                                <text x={cx} y={cy - pinHeight - 21} fontSize="10" fill="white" textAnchor="middle">{agent.name}</text>
-                            </g>
-                        </g>
-                    );
-                })}
+            {/* 2D Fixed Pin Overlay (does NOT rotate) */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 500 350" preserveAspectRatio="xMidYMid slice">
+                <defs>
+                    <filter id="pinGlow" x="-50%" y="-50%" width="200%" height="200%">
+                        <feGaussianBlur stdDeviation="3" result="blur" />
+                        <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                    </filter>
+                </defs>
+                {pinPositions.map(agent => (
+                    <g key={agent.name} className="pointer-events-auto cursor-pointer">
+                        <line x1={agent.cx} y1={agent.cy} x2={agent.cx} y2={agent.cy - agent.pinH}
+                            stroke={agent.color} strokeWidth="2.5" opacity="0.85" />
+                        <ellipse cx={agent.cx} cy={agent.cy} rx="8" ry="4"
+                            fill="transparent" stroke={agent.color} strokeWidth="1.5" opacity="0.5" />
+                        <circle cx={agent.cx} cy={agent.cy} r="2.5" fill={agent.color} />
+                        <circle cx={agent.cx} cy={agent.cy - agent.pinH} r="16"
+                            fill={agent.color} filter="url(#pinGlow)" />
+                        <text x={agent.cx} y={agent.cy - agent.pinH + 5} fontSize="12" fill="white"
+                            textAnchor="middle" fontWeight="bold">{agent.score}</text>
+                    </g>
+                ))}
             </svg>
         </div>
     );
@@ -314,16 +329,20 @@ export const DashboardStyle: React.FC = () => {
             case 'chart_trend':
                 return (
                     <WidgetWrapper id={id} title="Conversations Over Time">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={conversationsData}>
-                                <GlowFilter />
-                                <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#334155" : "#e2e8f0"} vertical={false} />
-                                <XAxis dataKey="day" hide />
-                                <YAxis hide />
-                                <RechartsTooltip content={<CustomTooltip />} />
-                                <Area type="monotone" dataKey="count" stroke="#55b7e0" strokeWidth={3} fill="url(#areaGrad)" filter="url(#neonGlow)" />
-                            </AreaChart>
-                        </ResponsiveContainer>
+                        <div className="relative w-full h-full">
+                            <div className="absolute -inset-4 bg-[#55b7e0]/10 rounded-3xl blur-2xl pointer-events-none"></div>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={conversationsData}>
+                                    <GlowFilter />
+                                    <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#334155" : "#e2e8f0"} vertical={false} />
+                                    <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} />
+                                    <RechartsTooltip content={<CustomTooltip />} />
+                                    <Legend wrapperStyle={{fontSize: '11px', fontWeight: 600}} />
+                                    <Area type="monotone" dataKey="count" name="Conversations" stroke="#55b7e0" strokeWidth={3} fill="url(#areaGrad)" filter="url(#neonGlow)" />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
                     </WidgetWrapper>
                 );
             case 'chart_mountain':
@@ -335,62 +354,115 @@ export const DashboardStyle: React.FC = () => {
             case 'chart_sentiment':
                 return (
                     <WidgetWrapper id={id} title="Sentiment Analysis Trends">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={sentimentData}>
-                                <GlowFilter />
-                                <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#334155" : "#e2e8f0"} vertical={false} opacity={0.5}/>
-                                <XAxis dataKey="time" hide />
-                                <RechartsTooltip content={<CustomTooltip />} />
-                                <Line type="monotone" dataKey="positive" stroke="#10b981" strokeWidth={3} dot={{r: 4}} filter="url(#neonGlow)" />
-                                <Line type="monotone" dataKey="negative" stroke="#f43f5e" strokeWidth={3} dot={{r: 4}} filter="url(#neonGlow)" />
-                                <Line type="monotone" dataKey="neutral" stroke="#8b5cf6" strokeWidth={3} dot={{r: 4}} filter="url(#neonGlow)" />
-                            </LineChart>
-                        </ResponsiveContainer>
+                        <div className="relative w-full h-full">
+                            <div className="absolute -inset-4 bg-[#10b981]/10 rounded-3xl blur-2xl pointer-events-none"></div>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={sentimentData}>
+                                    <GlowFilter />
+                                    <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#334155" : "#e2e8f0"} vertical={false} opacity={0.5}/>
+                                    <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} />
+                                    <RechartsTooltip content={<CustomTooltip />} />
+                                    <Legend wrapperStyle={{fontSize: '11px', fontWeight: 600}} />
+                                    <Line type="monotone" dataKey="positive" name="Positive" stroke="#10b981" strokeWidth={3} dot={{r: 4}} filter="url(#neonGlow)" />
+                                    <Line type="monotone" dataKey="negative" name="Negative" stroke="#f43f5e" strokeWidth={3} dot={{r: 4}} filter="url(#neonGlow)" />
+                                    <Line type="monotone" dataKey="neutral" name="Neutral" stroke="#8b5cf6" strokeWidth={3} dot={{r: 4}} filter="url(#neonGlow)" />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
                     </WidgetWrapper>
                 );
             case 'chart_human_ai':
                 return (
                     <WidgetWrapper id={id} title="Human vs. AI Intervention">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={humanVsAiData} layout="vertical">
-                                <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#334155" : "#e2e8f0"} horizontal={false} opacity={0.5} />
-                                <XAxis type="number" hide />
-                                <YAxis dataKey="day" type="category" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} width={40} />
-                                <RechartsTooltip content={<CustomTooltip />} />
-                                <Legend wrapperStyle={{fontSize: '10px'}} />
-                                <Bar dataKey="ai" name="AI Handled" stackId="a" fill="#55b7e0" radius={[0, 0, 0, 0]} />
-                                <Bar dataKey="human" name="Human Escalated" stackId="a" fill="#fab728" radius={[0, 4, 4, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
+                        <div className="relative w-full h-full">
+                            <div className="absolute -inset-4 bg-[#55b7e0]/10 rounded-3xl blur-2xl pointer-events-none"></div>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={humanVsAiData} layout="vertical">
+                                    <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#334155" : "#e2e8f0"} horizontal={false} opacity={0.5} />
+                                    <XAxis type="number" hide />
+                                    <YAxis dataKey="day" type="category" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} width={40} />
+                                    <RechartsTooltip content={<CustomTooltip />} />
+                                    <Legend wrapperStyle={{fontSize: '11px', fontWeight: 600}} />
+                                    <Bar dataKey="ai" name="AI Handled" stackId="a" fill="#55b7e0" radius={[0, 0, 0, 0]} />
+                                    <Bar dataKey="human" name="Human Escalated" stackId="a" fill="#fab728" radius={[0, 4, 4, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
                     </WidgetWrapper>
                 );
             case 'chart_radar':
                 return (
                     <WidgetWrapper id={id} title="Agent Performance Matrix">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
-                                <PolarGrid stroke={isDarkMode ? "#334155" : "#e2e8f0"} />
-                                <PolarAngleAxis dataKey="subject" tick={{fill: '#64748b', fontSize: 10}} />
-                                <Radar name="Support Bot" dataKey="A" stroke="#55b7e0" fill="#55b7e0" fillOpacity={0.4} strokeWidth={2} />
-                                <Radar name="Sales Agent" dataKey="B" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.4} strokeWidth={2} />
-                            </RadarChart>
-                        </ResponsiveContainer>
+                        <div className="relative w-full h-full">
+                            <div className="absolute -inset-4 bg-[#8b5cf6]/10 rounded-3xl blur-2xl pointer-events-none"></div>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
+                                    <PolarGrid stroke={isDarkMode ? "#334155" : "#e2e8f0"} />
+                                    <PolarAngleAxis dataKey="subject" tick={{fill: '#64748b', fontSize: 10}} />
+                                    <Legend wrapperStyle={{fontSize: '11px', fontWeight: 600}} />
+                                    <Radar name="Support Bot" dataKey="A" stroke="#55b7e0" fill="#55b7e0" fillOpacity={0.4} strokeWidth={2} />
+                                    <Radar name="Sales Agent" dataKey="B" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.4} strokeWidth={2} />
+                                </RadarChart>
+                            </ResponsiveContainer>
+                        </div>
                     </WidgetWrapper>
                 );
             case 'chart_topics':
                 return (
                     <WidgetWrapper id={id} title="Top Resolution Topics">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <GlowFilter />
-                                <Pie data={topicsData} cx="50%" cy="50%" innerRadius={50} outerRadius={70} dataKey="value" stroke="none">
-                                    {topicsData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} filter="url(#neonGlow)" />
+                        <div className="relative w-full h-full">
+                            <div className="absolute -inset-4 bg-[#55b7e0]/10 rounded-3xl blur-2xl pointer-events-none"></div>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <GlowFilter />
+                                    <Pie data={topicsData} cx="50%" cy="50%" innerRadius={50} outerRadius={70} dataKey="value" stroke="none">
+                                        {topicsData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} filter="url(#neonGlow)" />
+                                        ))}
+                                    </Pie>
+                                    <RechartsTooltip content={<CustomTooltip />} />
+                                    <Legend wrapperStyle={{fontSize: '11px', fontWeight: 600}} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </WidgetWrapper>
+                );
+            case 'chart_heatmap':
+                return (
+                    <WidgetWrapper id={id} title="Agent Usage Heatmap">
+                        <div className="relative w-full h-full">
+                            <div className="absolute -inset-4 bg-[#55b7e0]/10 rounded-3xl blur-2xl pointer-events-none"></div>
+                            <div className="w-full h-full overflow-auto">
+                                {/* Legend bar */}
+                                <div className="flex items-center justify-end gap-1.5 mb-3 text-[10px] font-medium" style={{color: '#64748b'}}>
+                                    <span>Low</span>
+                                    <div className="flex gap-0.5">
+                                        {['#1e293b','#1a3a4a','#1a5066','#2a7a99','#55b7e0','#7dd3fc'].map(c => (
+                                            <div key={c} className="w-3 h-3 rounded-sm" style={{backgroundColor: c}} />
+                                        ))}
+                                    </div>
+                                    <span>High</span>
+                                </div>
+                                {/* Column headers */}
+                                <div className="flex items-center mb-1">
+                                    <div className="w-24 shrink-0" />
+                                    {daysOfWeek.map(day => (
+                                        <div key={day} className="flex-1 text-center text-[10px] font-bold uppercase tracking-wider" style={{color: '#64748b'}}>{day}</div>
                                     ))}
-                                </Pie>
-                                <RechartsTooltip content={<CustomTooltip />} />
-                            </PieChart>
-                        </ResponsiveContainer>
+                                </div>
+                                {/* Rows */}
+                                {heatmapData.map(row => (
+                                    <div key={row.agent} className="flex items-center gap-1 mb-1">
+                                        <div className="w-24 shrink-0 text-xs font-semibold truncate pr-2" style={{color: '#94a3b8'}}>{row.agent}</div>
+                                        {row.data.map(cell => (
+                                            <div key={cell.day} className="flex-1 aspect-[2/1] rounded-md transition-colors"
+                                                style={{backgroundColor: getHeatmapColor(cell.value)}}
+                                                title={`${row.agent} — ${cell.day}: ${cell.value}`} />
+                                        ))}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </WidgetWrapper>
                 );
             default:
@@ -581,8 +653,13 @@ export const DashboardStyle: React.FC = () => {
                         right: 0px;
                         z-index: 20;
                     }
-                    .perspective-1000 {
-                        perspective: 1000px;
+                    @keyframes mountainRotate {
+                        0%   { transform: rotateY(0deg); }
+                        100% { transform: rotateY(360deg); }
+                    }
+                    .mountain-rotate-container {
+                        animation: mountainRotate 30s linear infinite;
+                        transform-style: preserve-3d;
                     }
                 `}
             </style>
