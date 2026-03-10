@@ -1,274 +1,527 @@
-import React from 'react';
-import { Search, Bell, ChevronDown, Info, ArrowUpRight, HelpCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Responsive } from 'react-grid-layout';
+import { WidthProvider } from 'react-grid-layout/legacy';
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
+import {
+    Plus, Search, GripHorizontal, X, MessageSquare, Bot, Send, Database,
+    Zap, Sparkles, TrendingUp, Bell, ChevronDown, Trash2
+} from 'lucide-react';
+import {
+    AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
+    BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Legend
+} from 'recharts';
+
+const ResponsiveGridLayout = WidthProvider(Responsive);
+
+// --- Mock Data ---
+
+const kpiData = [
+    { id: 'kpi_1', label: 'Active Conversations', value: '847', icon: MessageSquare, color: '#55b7e0' },
+    { id: 'kpi_2', label: 'Total Agents Deployed', value: '12', icon: Bot, color: '#fab728' },
+    { id: 'kpi_3', label: 'Messages Processed Today', value: '3,291', icon: Send, color: '#0ea5e9' },
+    { id: 'kpi_4', label: 'Average Resolution Time', value: '4m 12s', icon: Zap, color: '#8b5cf6' },
+];
+
+const conversationsData = [
+    { day: 'Mon', count: 120 }, { day: 'Tue', count: 180 }, { day: 'Wed', count: 150 },
+    { day: 'Thu', count: 240 }, { day: 'Fri', count: 210 }, { day: 'Sat', count: 90 }, { day: 'Sun', count: 110 }
+];
+
+const sentimentData = [
+    { time: '10am', positive: 80, neutral: 45, negative: 10 },
+    { time: '12pm', positive: 85, neutral: 40, negative: 15 },
+    { time: '2pm', positive: 95, neutral: 30, negative: 5 },
+    { time: '4pm', positive: 60, neutral: 50, negative: 20 },
+    { time: '6pm', positive: 110, neutral: 20, negative: 8 },
+];
+
+const humanVsAiData = [
+    { day: 'Mon', ai: 400, human: 120 },
+    { day: 'Tue', ai: 500, human: 90 },
+    { day: 'Wed', ai: 450, human: 150 },
+    { day: 'Thu', ai: 600, human: 80 },
+    { day: 'Fri', ai: 550, human: 110 },
+];
+
+const topicsData = [
+    { name: 'Billing', value: 400, color: '#55b7e0' },
+    { name: 'Technical', value: 300, color: '#8b5cf6' },
+    { name: 'Onboarding', value: 300, color: '#fab728' },
+    { name: 'Account', value: 200, color: '#f43f5e' },
+];
+
+const radarData = [
+    { subject: 'Speed', A: 120, B: 110, fullMark: 150 },
+    { subject: 'Accuracy', A: 98, B: 130, fullMark: 150 },
+    { subject: 'Sentiment', A: 86, B: 130, fullMark: 150 },
+    { subject: 'Handling', A: 99, B: 100, fullMark: 150 },
+    { subject: 'Retention', A: 85, B: 90, fullMark: 150 },
+];
+
+const mountainAgents = [
+    { name: 'Support Bot', score: 98, color: '#10b981' }, // Peak
+    { name: 'Sales Agent', score: 75, color: '#55b7e0' },
+    { name: 'FAQ Helper', score: 62, color: '#8b5cf6' },
+    { name: 'Billing Bot', score: 40, color: '#fab728' },
+    { name: 'Onboarding AI', score: 25, color: '#f43f5e' } // Base
+];
+
+// --- Sub-Components ---
+
+const GlowFilter = () => (
+    <defs>
+        <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+            </feMerge>
+        </filter>
+        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="#55b7e0" stopOpacity={0.4} />
+            <stop offset="95%" stopColor="#55b7e0" stopOpacity={0} />
+        </linearGradient>
+    </defs>
+);
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+        return (
+            <div className="bg-[#1e293b]/90 backdrop-blur-md border border-white/10 rounded-xl shadow-2xl p-3 text-xs text-white">
+                <p className="font-bold text-slate-300 mb-1">{label}</p>
+                {payload.map((entry: any, i: number) => (
+                    <p key={i} style={{ color: entry.color }} className="font-medium drop-shadow-md">
+                        {entry.name}: {entry.value}
+                    </p>
+                ))}
+            </div>
+        );
+    }
+    return null;
+};
+
+// Extracted Complex Charts
+const MountainTracker = () => (
+    <div className="w-full h-full relative overflow-hidden bg-slate-900/40 rounded-xl border border-white/5 flex items-end justify-center perspective-1000">
+        <svg className="w-full h-full" viewBox="0 0 500 300" preserveAspectRatio="none">
+            <GlowFilter />
+            {/* Topographic Lines/Wireframe Base */}
+            {[...Array(8)].map((_, i) => (
+                <ellipse key={`el-${i}`} cx="250" cy={250 - (i * 10)} rx={200 - (i * 20)} ry={60 - (i * 5)} 
+                    fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+            ))}
+            
+            {/* The Mountain Peak Area */}
+            <path d="M50 250 Q150 230 250 50 Q350 230 450 250 Z" 
+                fill="url(#areaGrad)" stroke="#55b7e0" strokeWidth="2" filter="url(#neonGlow)" />
+                
+            {/* Route Dashed Line */}
+            <path d="M100 240 Q180 150 250 50" fill="none" stroke="white" strokeWidth="2" strokeDasharray="5,5" opacity="0.6"/>
+
+            {/* Agent Pins */}
+            {mountainAgents.map((agent, i) => {
+                // Approximate pin position based on score (100 = Peak 250,50 ; 0 = Base 100,240)
+                const heightRatio = agent.score / 100;
+                const topY = 50; const baseY = 240;
+                const topX = 250; const baseX = 100;
+                const cx = baseX + (topX - baseX) * heightRatio;
+                const cy = baseY - (baseY - topY) * heightRatio;
+
+                return (
+                    <g key={agent.name} className="group relative cursor-pointer">
+                        <circle cx={cx} cy={cy} r="6" fill="#1e293b" stroke={agent.color} strokeWidth="3" filter="url(#neonGlow)" />
+                        <line x1={cx} y1={cy} x2={cx} y2={cy-30} stroke={agent.color} strokeWidth="2" />
+                        <circle cx={cx} cy={cy-30} r="12" fill={agent.color} filter="url(#neonGlow)" />
+                        <text x={cx} y={cy-26} fontSize="10" fill="white" textAnchor="middle" fontWeight="bold">{agent.score}</text>
+                    </g>
+                );
+            })}
+        </svg>
+    </div>
+);
+
+// --- Main Component ---
 
 export const DashboardStyle: React.FC = () => {
+    // Layout State
+    const [layouts, setLayouts] = useState<any>({
+        lg: [
+            { i: 'kpi_1', x: 0, y: 0, w: 3, h: 2 },
+            { i: 'kpi_2', x: 3, y: 0, w: 3, h: 2 },
+            { i: 'kpi_3', x: 6, y: 0, w: 3, h: 2 },
+            { i: 'kpi_4', x: 9, y: 0, w: 3, h: 2 },
+            { i: 'chart_trend', x: 0, y: 2, w: 6, h: 4 },
+            { i: 'chart_mountain', x: 6, y: 2, w: 6, h: 4 },
+            { i: 'chart_sentiment', x: 0, y: 6, w: 6, h: 4 },
+            { i: 'chart_human_ai', x: 6, y: 6, w: 3, h: 4 },
+            { i: 'chart_radar', x: 9, y: 6, w: 3, h: 4 },
+        ]
+    });
+
+    const [activeWidgets, setActiveWidgets] = useState([
+        'kpi_1', 'kpi_2', 'kpi_3', 'kpi_4', 'chart_trend', 'chart_mountain', 'chart_sentiment', 'chart_human_ai', 'chart_radar'
+    ]);
+
+    const [isDarkMode, setIsDarkMode] = useState(true);
+    const [showGraphModal, setShowGraphModal] = useState(false);
+    const [showConfirmModal, setShowConfirmModal] = useState<string | null>(null);
+
+    // Available catalog of widgets
+    const widgetCatalog = [
+        { id: 'chart_trend', title: 'Conversations Over Time' },
+        { id: 'chart_mountain', title: 'Peak Performance Tracker' },
+        { id: 'chart_sentiment', title: 'Sentiment Analysis Trends' },
+        { id: 'chart_human_ai', title: 'Human vs. AI Intervention' },
+        { id: 'chart_radar', title: 'Agent Performance Matrix' },
+        { id: 'chart_topics', title: 'Top Resolution Topics' },
+        { id: 'chart_heatmap', title: 'Agent Usage Heatmap' },
+    ];
+
+    const removeWidget = (id: string) => {
+        setActiveWidgets(prev => prev.filter(w => w !== id));
+        setShowConfirmModal(null);
+    };
+
+    const addWidget = (id: string) => {
+        if (!activeWidgets.includes(id)) {
+            setActiveWidgets(prev => [...prev, id]);
+            
+            // Add to layout
+            const newLayout = [...layouts.lg];
+            newLayout.push({ i: id, x: 0, y: Infinity, w: 6, h: 4 });
+            setLayouts({ ...layouts, lg: newLayout });
+        }
+        setShowGraphModal(false);
+    };
+
+    const WidgetWrapper = ({ id, title, children, isKpi = false }: any) => {
+        return (
+            <div className={`w-full h-full rounded-[2rem] border relative group transition-colors duration-300
+                ${isDarkMode ? 'bg-[#10141d]/80 border-white/5 shadow-2xl shadow-black/50 backdrop-blur-md' : 'bg-white border-slate-200 shadow-xl'}`}>
+                
+                {/* Header (Hidden until hover) */}
+                <div className={`absolute top-0 left-0 right-0 h-10 px-4 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity z-10 rounded-t-[2rem]
+                    ${isDarkMode ? 'bg-gradient-to-b from-[#1c212c] to-transparent' : 'bg-gradient-to-b from-slate-100 to-transparent'}`}>
+                    
+                    <div className="flex items-center gap-2 cursor-grab active:cursor-grabbing draggable-handle">
+                        <GripHorizontal size={14} className={isDarkMode ? 'text-slate-400' : 'text-slate-500'} />
+                        <span className={`text-xs font-semibold ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{title}</span>
+                    </div>
+
+                    <button onClick={() => setShowConfirmModal(id)} className="p-1 rounded-full hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors">
+                        <X size={14} strokeWidth={3} />
+                    </button>
+                </div>
+
+                <div className="p-6 h-full w-full pt-8 flex flex-col">
+                    {!isKpi && <h3 className={`text-sm font-bold mb-4 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{title}</h3>}
+                    <div className="flex-1 w-full min-h-0 relative">
+                        {children}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const renderWidget = (id: string) => {
+        // KPI Render
+        const kpi = kpiData.find(k => k.id === id);
+        if (kpi) {
+            return (
+                <WidgetWrapper id={id} title={kpi.label} isKpi>
+                    <div className="flex flex-col h-full justify-between">
+                        <div className="flex justify-between items-start">
+                            <div className={`size-12 rounded-2xl flex items-center justify-center`} style={{ backgroundColor: `${kpi.color}20`, color: kpi.color }}>
+                                <kpi.icon size={24} style={{ filter: `drop-shadow(0 0 8px ${kpi.color}80)` }} />
+                            </div>
+                            <TrendingUp size={16} className="text-emerald-400" />
+                        </div>
+                        <div>
+                            <h4 className={`text-3xl font-black mt-4 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{kpi.value}</h4>
+                            <p className="text-sm text-slate-500 mt-1 font-medium">{kpi.label}</p>
+                        </div>
+                    </div>
+                </WidgetWrapper>
+            );
+        }
+
+        // Feature Charts Render
+        switch(id) {
+            case 'chart_trend':
+                return (
+                    <WidgetWrapper id={id} title="Conversations Over Time">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={conversationsData}>
+                                <GlowFilter />
+                                <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#334155" : "#e2e8f0"} vertical={false} />
+                                <XAxis dataKey="day" hide />
+                                <YAxis hide />
+                                <RechartsTooltip content={<CustomTooltip />} />
+                                <Area type="monotone" dataKey="count" stroke="#55b7e0" strokeWidth={3} fill="url(#areaGrad)" filter="url(#neonGlow)" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </WidgetWrapper>
+                );
+            case 'chart_mountain':
+                return (
+                    <WidgetWrapper id={id} title="Peak Performance Tracker">
+                        <MountainTracker />
+                    </WidgetWrapper>
+                );
+            case 'chart_sentiment':
+                return (
+                    <WidgetWrapper id={id} title="Sentiment Analysis Trends">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={sentimentData}>
+                                <GlowFilter />
+                                <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#334155" : "#e2e8f0"} vertical={false} opacity={0.5}/>
+                                <XAxis dataKey="time" hide />
+                                <RechartsTooltip content={<CustomTooltip />} />
+                                <Line type="monotone" dataKey="positive" stroke="#10b981" strokeWidth={3} dot={{r: 4}} filter="url(#neonGlow)" />
+                                <Line type="monotone" dataKey="negative" stroke="#f43f5e" strokeWidth={3} dot={{r: 4}} filter="url(#neonGlow)" />
+                                <Line type="monotone" dataKey="neutral" stroke="#8b5cf6" strokeWidth={3} dot={{r: 4}} filter="url(#neonGlow)" />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </WidgetWrapper>
+                );
+            case 'chart_human_ai':
+                return (
+                    <WidgetWrapper id={id} title="Human vs. AI Intervention">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={humanVsAiData} layout="vertical">
+                                <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#334155" : "#e2e8f0"} horizontal={false} opacity={0.5} />
+                                <XAxis type="number" hide />
+                                <YAxis dataKey="day" type="category" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} width={40} />
+                                <RechartsTooltip content={<CustomTooltip />} />
+                                <Legend wrapperStyle={{fontSize: '10px'}} />
+                                <Bar dataKey="ai" name="AI Handled" stackId="a" fill="#55b7e0" radius={[0, 0, 0, 0]} />
+                                <Bar dataKey="human" name="Human Escalated" stackId="a" fill="#fab728" radius={[0, 4, 4, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </WidgetWrapper>
+                );
+            case 'chart_radar':
+                return (
+                    <WidgetWrapper id={id} title="Agent Performance Matrix">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
+                                <PolarGrid stroke={isDarkMode ? "#334155" : "#e2e8f0"} />
+                                <PolarAngleAxis dataKey="subject" tick={{fill: '#64748b', fontSize: 10}} />
+                                <Radar name="Support Bot" dataKey="A" stroke="#55b7e0" fill="#55b7e0" fillOpacity={0.4} strokeWidth={2} />
+                                <Radar name="Sales Agent" dataKey="B" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.4} strokeWidth={2} />
+                            </RadarChart>
+                        </ResponsiveContainer>
+                    </WidgetWrapper>
+                );
+            case 'chart_topics':
+                return (
+                    <WidgetWrapper id={id} title="Top Resolution Topics">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <GlowFilter />
+                                <Pie data={topicsData} cx="50%" cy="50%" innerRadius={50} outerRadius={70} dataKey="value" stroke="none">
+                                    {topicsData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} filter="url(#neonGlow)" />
+                                    ))}
+                                </Pie>
+                                <RechartsTooltip content={<CustomTooltip />} />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </WidgetWrapper>
+                );
+            default:
+                return <WidgetWrapper id={id} title="Widget" />;
+        }
+    };
+
     return (
-        <div className="min-h-screen bg-[#0d1017] text-white font-sans p-6 overflow-x-hidden">
-            {/* Top Header */}
-            <header className="flex justify-between items-center mb-8">
-                <div className="flex items-center gap-2 cursor-pointer">
-                    <h1 className="text-xl font-medium tracking-wide">Dashboard</h1>
-                    <ChevronDown size={16} className="text-slate-400" />
+        <div className={`min-h-screen font-sans overflow-x-hidden transition-colors duration-500
+            ${isDarkMode ? 'bg-[#0d1017] text-white' : 'bg-[#f8fafc] text-slate-900'}`}>
+            
+            {/* --- Global Header --- */}
+            <header className="flex justify-between items-center p-6 mb-2 border-b border-white/5">
+                <div className="flex items-center gap-3">
+                    <h1 className="text-2xl font-black tracking-tight" style={{fontFamily: "'Inter', sans-serif"}}>
+                        Welcome, Alex <span className="inline-block hover:animate-pulse cursor-default">👋</span>
+                    </h1>
+                </div>
+
+                {/* Central Tabs Navigation */}
+                <div className={`hidden lg:flex items-center p-1.5 rounded-full border shadow-sm
+                    ${isDarkMode ? 'bg-[#151a23] border-white/5' : 'bg-white border-slate-200'}`}>
+                    {['Overview', 'Add Knowledge Source', 'View Latest Conversation', 'Add New Tool'].map((tab, i) => (
+                        <button key={tab} className={`px-5 py-2 text-sm font-semibold rounded-full transition-all duration-300
+                            ${i === 0 
+                                ? 'bg-[#55b7e0] text-white shadow-[0_0_15px_rgba(85,183,224,0.4)]' 
+                                : `hover:text-[#55b7e0] ${isDarkMode ? 'text-slate-400 relative' : 'text-slate-500 relative'} `
+                            }`}>
+                            {tab}
+                        </button>
+                    ))}
                 </div>
 
                 <div className="flex items-center gap-4">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                        <input
-                            type="text"
-                            placeholder="STOMina campaign"
-                            className="bg-[#1c212c] text-sm rounded-full py-2 pl-10 pr-4 w-64 focus:outline-none focus:ring-1 focus:ring-white/20 border-none text-slate-200 placeholder:text-slate-500"
-                        />
-                        <div className="absolute right-2 top-1/2 -translate-y-1/2 bg-[#2d3342] rounded-full p-1 cursor-pointer hover:bg-[#383f52]">
-                            <ArrowUpRight size={12} className="text-slate-300" />
-                        </div>
-                    </div>
-
-                    <button className="flex items-center gap-2 bg-[#1c212c] hover:bg-[#2d3342] transition-colors rounded-full py-2 px-4 shadow-sm">
-                        <div className="relative">
-                            <Bell size={16} className="text-slate-300" />
-                            <div className="absolute top-0 right-0 size-1.5 bg-red-500 rounded-full"></div>
-                        </div>
-                        <span className="text-sm font-medium">2 new</span>
+                    {/* Theme Toggle */}
+                    <button onClick={() => setIsDarkMode(!isDarkMode)} className={`p-2 rounded-full border ${isDarkMode ? 'bg-[#151a23] border-white/5 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
+                        <Sparkles size={16} />
+                    </button>
+                    
+                    {/* CTA */}
+                    <button className="flex items-center gap-2 bg-[#55b7e0] hover:bg-[#3ba2cf] transition-all duration-300 rounded-full py-2.5 px-6 font-bold text-white shadow-[0_0_20px_rgba(85,183,224,0.3)] hover:shadow-[0_0_30px_rgba(85,183,224,0.6)]">
+                        <Plus size={18} />
+                        <span>Create a New Agent</span>
                     </button>
                 </div>
             </header>
 
-            {/* Main Grid Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-                {/* Left Column: My Campaigns */}
-                <div className="flex flex-col gap-4">
-                    <div className="flex justify-between items-end mb-2">
-                        <div>
-                            <h2 className="text-2xl font-semibold">My Campaigns</h2>
-                            <p className="text-slate-400 text-sm mt-1">
-                                3 persons and <span className="text-slate-300">@yerimaldo</span> have access.
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-2 bg-[#1c212c] px-4 py-2 rounded-xl cursor-pointer hover:bg-[#252b38] border border-white/5">
-                            <span className="text-sm font-medium">Finance</span>
-                            <ChevronDown size={16} className="text-slate-400" />
-                        </div>
-                    </div>
-
-                    {/* Overview Card */}
-                    <div className="bg-[#121620] rounded-3xl p-6 border border-white/5 shadow-2xl relative overflow-hidden">
-                        {/* Soft Glow Background */}
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
-
-                        <div className="flex justify-between items-start mb-6">
-                            <h3 className="text-lg font-medium">Overview</h3>
-                            <Info size={18} className="text-slate-500 cursor-pointer hover:text-slate-300" />
-                        </div>
-
-                        <div className="space-y-3 mb-6">
-                            <div className="flex justify-between text-sm">
-                                <span className="text-slate-400">Max records</span>
-                                <span className="font-medium">2 times increase to the last month</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-slate-400">Comparative rates</span>
-                                <span className="font-medium text-blue-400">+ 12.83 %</span>
-                            </div>
-                        </div>
-
-                        {/* Time Toggles */}
-                        <div className="flex bg-[#0a0d14] p-1 rounded-2xl mb-8 border border-white/5 w-max">
-                            <button className="px-6 py-2 text-sm text-slate-400 font-medium rounded-xl hover:text-slate-200 transition-colors">24h</button>
-                            <button className="px-6 py-2 text-sm text-slate-400 font-medium rounded-xl hover:text-slate-200 transition-colors">Week</button>
-                            <button className="px-6 py-2 text-sm text-white font-medium bg-[#212b40] rounded-xl shadow-md border border-white/10">Month</button>
-                        </div>
-
-                        {/* Mock Chart Area */}
-                        <div className="relative h-48 w-full mt-10 mb-6 group">
-                            {/* Grid Lines */}
-                            <div className="absolute inset-0 flex flex-col justify-between opacity-10 pointer-events-none">
-                                <div className="border-b border-dashed border-white w-full h-0"></div>
-                                <div className="border-b border-dashed border-white w-full h-0"></div>
-                                <div className="border-b border-dashed border-white w-full h-0"></div>
-                                <div className="border-b border-dashed border-white w-full h-0"></div>
-                            </div>
-
-                            {/* Fake SVG Chart Line */}
-                            <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
-                                <defs>
-                                    <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.8" />
-                                        <stop offset="100%" stopColor="#60a5fa" stopOpacity="1" />
-                                    </linearGradient>
-
-                                    {/* Subtle drop shadow under the line */}
-                                    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                                        <feGaussianBlur stdDeviation="2" result="blur" />
-                                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                                    </filter>
-                                </defs>
-
-                                <path
-                                    d="M0 80 Q10 75 20 60 T40 50 T55 30 T70 35 T85 10 T100 30"
-                                    fill="none"
-                                    stroke="url(#lineGrad)"
-                                    strokeWidth="2.5"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    filter="url(#glow)"
-                                />
-
-                                {/* Active Point (Mar 29) */}
-                                <circle cx="55" cy="30" r="4" fill="#1e293b" stroke="#60a5fa" strokeWidth="2.5" />
-
-                                {/* Dashed vertical line down from active point */}
-                                <line x1="55" y1="30" x2="55" y2="100" stroke="#60a5fa" strokeWidth="1" strokeDasharray="2,2" opacity="0.5" />
-                            </svg>
-
-                            {/* Tooltip (Mock) */}
-                            <div className="absolute left-[45%] top-[35%] bg-[#1a2333] border border-blue-500/20 shadow-2xl rounded-2xl p-4 w-32 backdrop-blur-md transform transition-transform group-hover:scale-105 z-10">
-                                <p className="text-blue-400 text-xs mb-1 font-medium">Mar 29</p>
-                                <p className="text-white text-base font-bold mb-0.5">$ 5,538.65</p>
-                                <p className="text-blue-400 text-xs font-medium">+ 9.41 %</p>
-                            </div>
-                        </div>
-
-                        {/* X Axis Labels */}
-                        <div className="flex justify-between text-xs text-slate-500 mt-2 px-2">
-                            <span>Mar 8</span>
-                            <span>Mar 18</span>
-                            <span>Mar 28</span>
-                            <span>Apr 8</span>
-                        </div>
-
-                        {/* Bottom Stats */}
-                        <div className="mt-8 flex justify-between items-end border-t border-white/5 pt-6">
-                            <div className="flex items-baseline gap-1">
-                                <span className="text-blue-500 text-3xl font-light">+</span>
-                                <span className="text-4xl font-semibold tracking-tight">19.23</span>
-                                <span className="text-2xl text-slate-400">%</span>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-slate-500 text-xs mb-1">Last updated</p>
-                                <p className="text-sm font-medium">Today, 06:49 AM</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Further items in left column (e.g. My Top Campaigns header) */}
-                    <div className="flex justify-between items-center mt-6 px-1">
-                        <h2 className="text-xl font-semibold text-slate-100">My Top Campaigns</h2>
-                        <div className="flex items-center gap-4 text-sm">
-                            <span className="text-slate-500">02 of 5</span>
-                            <div className="flex gap-2">
-                                <button className="size-8 bg-[#1c212c] rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-[#2d3342] transition-colors"><span className="text-lg leading-none">&larr;</span></button>
-                                <button className="size-8 bg-[#2d3342] rounded-full flex items-center justify-center text-white hover:bg-[#383f52] transition-colors"><span className="text-lg leading-none">&rarr;</span></button>
-                            </div>
-                        </div>
-                    </div>
-                    {/* Mock bottom cards could go here */}
-
+            {/* --- Dashboard Toolbar --- */}
+            <div className="max-w-[1600px] mx-auto px-6 py-4 flex justify-between items-center z-20 relative">
+                <div>
+                     <p className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        AI Agent building platform and customer support
+                    </p>
                 </div>
 
-                {/* Right Column: Total Balance */}
-                <div className="flex flex-col gap-4">
-                    <div className="flex justify-between items-end mb-2">
-                        <div>
-                            <h2 className="text-2xl font-semibold">Total Balance</h2>
-                            <p className="text-slate-400 text-sm mt-1">
-                                The sum of all amounts on <span className="text-slate-300 font-medium">my wallet</span>
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-2 bg-[#1c212c] px-4 py-2 rounded-xl cursor-pointer hover:bg-[#252b38] border border-white/5">
-                            <span className="text-sm font-medium">US Dollar</span>
-                            <ChevronDown size={16} className="text-slate-400" />
-                        </div>
-                    </div>
-
-                    <div className="bg-[#0f131a] rounded-[2rem] p-8 border border-white/5 shadow-2xl">
-                        {/* Balance Top */}
-                        <div className="flex justify-between items-start mb-8">
-                            <div className="flex items-baseline gap-2">
-                                <span className="text-blue-500 text-4xl font-light">$</span>
-                                <span className="text-5xl font-semibold tracking-tight">23,094.57</span>
-                            </div>
-                            <div className="text-right mt-2 text-sm">
-                                <p className="text-slate-400 mb-1">Compared to last month</p>
-                                <p className="text-red-400 font-medium">- 37.16 %</p>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-between items-center mb-8 pb-8 border-b border-white/5">
-                            <div className="flex items-center gap-2 text-sm">
-                                <span className="text-slate-500">Yearly avg:</span>
-                                <span className="font-medium">$ 34,502.19</span>
-                                <ArrowUpRight size={14} className="text-blue-500" />
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer hover:text-white transition-colors">
-                                <HelpCircle size={16} />
-                                <span className="font-medium border-b border-dashed border-slate-500 pb-0.5">How it works?</span>
-                            </div>
-                        </div>
-
-                        {/* AI Assistant Card */}
-                        <div className="bg-gradient-to-br from-[#131c31] to-[#0e1628] rounded-3xl p-6 border border-blue-500/20 overflow-hidden relative min-h-[220px]">
-                            {/* Background Stars / Dust */}
-                            <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'radial-gradient(circle at 20% 30%, white 1px, transparent 1px), radial-gradient(circle at 80% 40%, white 1px, transparent 1px), radial-gradient(circle at 40% 80%, white 1px, transparent 1px)', backgroundSize: '100px 100px' }}></div>
-
-                            <div className="relative z-10 flex flex-col items-center justify-center text-center mt-2 h-full">
-                                <h4 className="text-blue-400 font-medium text-lg mb-2 tracking-wide">Ai Assistant</h4>
-                                <div className="flex items-center gap-3 text-sm text-slate-300 bg-white/5 px-4 py-2 rounded-full border border-white/10 backdrop-blur-sm">
-                                    <div className="size-3.5 border-2 border-slate-400 border-t-white rounded-full animate-spin"></div>
-                                    <span>is updating the balance amount now...</span>
-                                </div>
-                            </div>
-
-                            {/* Decorative Blue Swirl at bottom */}
-                            <div className="absolute -bottom-24 left-1/2 -translate-x-1/2 w-[300px] h-[300px] bg-blue-600 rounded-full blur-[80px] opacity-40 mix-blend-screen"></div>
-
-                            {/* Fake 3D flower/swirl using CSS shapes & gradients for a quick mock */}
-                            <div className="absolute -bottom-16 left-1/2 -translate-x-1/2 w-48 h-48 opacity-90">
-                                {/* This represents the blue wavy orb at the bottom */}
-                                <div className="absolute inset-0 rounded-full bg-gradient-to-t from-blue-900 via-blue-600 to-blue-400 shadow-[0_0_50px_rgba(37,99,235,0.6)] mix-blend-plus-lighter" style={{ clipPath: 'polygon(50% 10%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)', transform: 'rotate(15deg) scale(1.5)', opacity: 0.8 }}></div>
-                                <div className="absolute inset-0 rounded-full bg-gradient-to-t from-blue-800 via-blue-500 to-blue-300" style={{ clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)', transform: 'rotate(45deg) scale(1.2)' }}></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Popular Campaigns Table Area */}
-                    <div className="bg-[#0f131a] rounded-[2rem] p-6 border border-white/5 shadow-2xl mt-4">
-                        <h3 className="text-lg font-medium mb-6 px-2">Popular Campaigns</h3>
-
-                        <div className="w-full overflow-x-auto">
-                            <table className="w-full text-left text-sm whitespace-nowrap">
-                                <thead>
-                                    <tr className="text-slate-500 border-b border-slate-800/50">
-                                        <th className="pb-4 font-normal px-2">Rank</th>
-                                        <th className="pb-4 font-normal px-2">Name</th>
-                                        <th className="pb-4 font-normal px-2">Admin</th>
-                                        <th className="pb-4 font-normal px-2">Date Added</th>
-                                        <th className="pb-4 font-normal px-2">Business</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr className="hover:bg-white/5 transition-colors group cursor-pointer">
-                                        <td className="py-4 px-2 text-slate-400 font-medium">#1</td>
-                                        <td className="py-4 px-2 font-medium">IBO Adve...</td>
-                                        <td className="py-4 px-2">
-                                            <div className="flex items-center gap-2">
-                                                <img src="https://picsum.photos/seed/samuel/32/32" alt="Samuel" className="size-6 rounded-full" />
-                                                <span className="text-slate-300">Samuel</span>
-                                            </div>
-                                        </td>
-                                        <td className="py-4 px-2 text-slate-400">02/14/2019</td>
-                                        <td className="py-4 px-2 text-slate-400">Advertisi...</td>
-                                    </tr>
-                                    {/* Add more mock rows if desired */}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                </div>
-
+                <button onClick={() => setShowGraphModal(true)} 
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all border
+                    ${isDarkMode ? 'bg-[#1c212c] text-white border-white/10 hover:bg-[#252b38]' : 'bg-white text-slate-800 border-slate-200 shadow-sm hover:bg-slate-50'}`}>
+                    <Plus size={16} className="text-[#55b7e0]" /> Add Widget
+                </button>
             </div>
+
+            {/* --- The Grid Area --- */}
+            <div className="max-w-[1600px] mx-auto px-4 pb-20 relative">
+                {/* Background ambient glow */}
+                {isDarkMode && <div className="absolute top-1/4 left-1/4 w-[800px] h-[800px] bg-[#55b7e0]/5 rounded-full blur-[120px] pointer-events-none -z-10"></div>}
+
+                <ResponsiveGridLayout
+                    className="layout"
+                    layouts={layouts}
+                    breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
+                    cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
+                    rowHeight={80}
+                    onLayoutChange={(layout, allLayouts) => setLayouts(allLayouts)}
+                    draggableHandle=".draggable-handle"
+                    margin={[20, 20]}
+                >
+                    {activeWidgets.map(id => (
+                        <div key={id}>
+                            {renderWidget(id)}
+                        </div>
+                    ))}
+                </ResponsiveGridLayout>
+            </div>
+
+            {/* --- Modals --- */}
+            
+            {/* Widget Removal Confirmation Modal */}
+            {showConfirmModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className={`p-8 rounded-3xl max-w-sm w-full mx-4 border animate-in fade-in zoom-in duration-200
+                        ${isDarkMode ? 'bg-[#10141d] border-white/10 shadow-2xl shadow-black' : 'bg-white border-slate-200 shadow-xl'}`}>
+                        <div className="flex justify-center mb-6">
+                            <div className="size-16 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
+                                <Trash2 size={32} />
+                            </div>
+                        </div>
+                        <h3 className={`text-xl font-bold text-center mb-2 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Remove Widget?</h3>
+                        <p className={`text-center text-sm mb-8 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Are you sure you want to remove this widget from your dashboard? You can always add it back later.
+                        </p>
+                        <div className="flex gap-4">
+                            <button onClick={() => setShowConfirmModal(null)} 
+                                className={`flex-1 py-3 rounded-xl font-semibold transition-colors
+                                ${isDarkMode ? 'bg-[#1c212c] text-white hover:bg-[#252b38]' : 'bg-slate-100 text-slate-800 hover:bg-slate-200'}`}>
+                                Cancel
+                            </button>
+                            <button onClick={() => removeWidget(showConfirmModal)} 
+                                className="flex-1 py-3 rounded-xl font-semibold bg-red-500 hover:bg-red-600 text-white shadow-[0_0_15px_rgba(239,68,68,0.4)] transition-all">
+                                Remove
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Add Graph / Request Modal */}
+            {showGraphModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-end z-50 overflow-hidden">
+                    <div className={`h-full w-full max-w-md p-6 overflow-y-auto border-l animate-in slide-in-from-right duration-300
+                        ${isDarkMode ? 'bg-[#10141d] border-white/10 shadow-2xl shadow-black relative' : 'bg-white border-slate-200 relative'}`}>
+                        
+                        <button onClick={() => setShowGraphModal(false)} className={`absolute top-6 right-6 p-2 rounded-full transition-colors ${isDarkMode ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}>
+                            <X size={20} />
+                        </button>
+
+                        <h2 className={`text-2xl font-bold mb-6 mt-12 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Widget Library</h2>
+                        
+                        <div className="space-y-3 mb-10">
+                            {widgetCatalog.map(widget => {
+                                const isActive = activeWidgets.includes(widget.id);
+                                return (
+                                    <div key={widget.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all
+                                        ${isDarkMode ? 'bg-[#1c212c] border-white/5' : 'bg-slate-50 border-slate-200'}
+                                        ${isActive ? 'opacity-50 grayscale' : 'hover:border-[#55b7e0]'}`}>
+                                        <span className={`font-semibold text-sm ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>{widget.title}</span>
+                                        <button 
+                                            disabled={isActive}
+                                            onClick={() => addWidget(widget.id)}
+                                            className={`size-8 rounded-full flex items-center justify-center transition-colors
+                                            ${isActive 
+                                                ? (isDarkMode ? 'bg-white/5 text-white/30' : 'bg-slate-200 text-slate-400')
+                                                : 'bg-[#55b7e0] text-white shadow-[0_0_10px_rgba(85,183,224,0.4)] hover:bg-[#3ba2cf]'
+                                            }`}>
+                                            <Plus size={16} />
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Request a Metric Box */}
+                        <div className={`p-6 rounded-3xl border mt-8 ${isDarkMode ? 'bg-gradient-to-br from-[#1c212c] to-[#151a23] border-[#55b7e0]/20' : 'bg-sky-50 border-sky-200'}`}>
+                            <div className="flex items-center gap-2 mb-3">
+                                <Sparkles size={18} className="text-[#55b7e0]" />
+                                <h3 className={`font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Request a Metric</h3>
+                            </div>
+                            <p className={`text-xs mb-4 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>Don't see the specific data you need? Tell our AI what you want to track.</p>
+                            <textarea 
+                                placeholder="E.g. I want to see average wait time mapped across different top-level intents..."
+                                className={`w-full p-4 rounded-xl text-sm min-h-[100px] border focus:outline-none focus:ring-2 focus:ring-[#55b7e0] resize-none mb-4
+                                ${isDarkMode ? 'bg-[#10141d] border-white/10 text-white placeholder:text-slate-600' : 'bg-white border-slate-200 text-slate-800 placeholder:text-slate-400'}`}
+                            ></textarea>
+                            <button className="w-full py-3 rounded-xl bg-[#55b7e0] text-white font-bold text-sm hover:bg-[#3ba2cf] transition-colors shadow-[0_0_15px_rgba(85,183,224,0.3)]">
+                                Submit Request
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom CSS for standardizing the draggable look and glowing animations */}
+            <style>
+                {`
+                    .react-grid-item > .react-resizable-handle::after {
+                        border-right: 2px solid #55b7e0;
+                        border-bottom: 2px solid #55b7e0;
+                        right: 8px;
+                        bottom: 8px;
+                        width: 10px;
+                        height: 10px;
+                    }
+                    .react-grid-item > .react-resizable-handle {
+                        width: 30px;
+                        height: 30px;
+                        bottom: 0px;
+                        right: 0px;
+                        z-index: 20;
+                    }
+                    .perspective-1000 {
+                        perspective: 1000px;
+                    }
+                `}
+            </style>
         </div>
     );
 };
