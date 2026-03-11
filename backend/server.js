@@ -149,21 +149,34 @@ app.post('/api/documents/fetch', async (req, res) => {
             method: 'GET'
         });
 
-        if (!n8nResponse.ok) {
-            return res.status(502).json({ error: 'Failed to fetch chunks from N8N' });
+        const rawText = await n8nResponse.text();
+        let n8nDocs = [];
+        try {
+            n8nDocs = JSON.parse(rawText);
+        } catch (e) {
+            console.error("N8N did not return JSON. Raw response was:", rawText);
+            return res.status(502).json({ error: 'N8N returned invalid JSON or empty response. Check N8N Webhook response settings.' });
         }
-
-        const n8nDocs = await n8nResponse.json();
         
         if (!Array.isArray(n8nDocs) || n8nDocs.length === 0) {
             return res.status(200).json([]); // No documents found
         }
 
         // 2. Query local mapping
-        const documentIds = n8nDocs.map(d => d.id).filter(id => id);
+        const documentIds = n8nDocs.map(d => d.document_id).filter(id => id);
         
         if (documentIds.length === 0) {
-            return res.status(200).json(n8nDocs);
+            // Return N8N docs properly formatted for React even if SQLite is empty
+            const fallbackDocs = n8nDocs.map(doc => ({
+                id: doc.document_id,
+                type: 'pdf',
+                name: 'Unknown Document',
+                description: doc.notas_humanas || 'Recently uploaded PDF document.',
+                status: 'Indexed',
+                timeAgo: 'Just now',
+                notas_humanas: doc.notas_humanas || ''
+            }));
+            return res.status(200).json(fallbackDocs);
         }
 
         const placeholders = documentIds.map(() => '?').join(',');
@@ -184,8 +197,13 @@ app.post('/api/documents/fetch', async (req, res) => {
 
             // 3. Merge data
             const enrichedDocs = n8nDocs.map(doc => ({
-                ...doc,
-                name: namesMap[doc.id] || doc.name || 'Unknown Document'
+                id: doc.document_id,
+                type: 'pdf',
+                name: namesMap[doc.document_id] || 'Unknown Document',
+                description: doc.notas_humanas || 'Recently uploaded PDF document.',
+                status: 'Indexed',
+                timeAgo: 'Just now',
+                notas_humanas: doc.notas_humanas || ''
             }));
 
             res.status(200).json(enrichedDocs);
