@@ -98,7 +98,7 @@ export const KnowledgeBase: React.FC = () => {
     ]);
 
     // N8N File Upload State
-    const [selectedDocument, setSelectedDocument] = useState<{ file: File, documentId: string, name: string } | null>(null);
+    const [selectedDocument, setSelectedDocument] = useState<{ file: File | null, documentId: string, name: string } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isUploading, setIsUploading] = useState(false);
     const API_BASE = 'http://localhost:3001/api/documents';
@@ -146,6 +146,14 @@ export const KnowledgeBase: React.FC = () => {
             });
             if (!response.ok) {
                 console.error("Failed to update notes in Local Backend -> N8N");
+            } else {
+                // Update local cached state so it persists without reloading
+                setDataSources(prev => prev.map(s => {
+                    if (s.id === documentId) {
+                        return { ...s, notas_humanas: notas_contexto };
+                    }
+                    return s;
+                }));
             }
         } catch (error) {
             console.error("Error updating notes in Local Backend -> N8N:", error);
@@ -180,8 +188,26 @@ export const KnowledgeBase: React.FC = () => {
         if (file) {
             const documentId = crypto.randomUUID();
             setSelectedDocument({ file, documentId, name: file.name });
+            setChatNotes([]); // Clear previous notes for new document
             // Do not upload or close modal immediately; wait for explicit Save and Sync.
         }
+    };
+
+    const handleManageSource = (source: DataSource) => {
+        setSelectedDocument({ file: null, documentId: source.id, name: source.name });
+        
+        // Render any existing notes from the database onto the chat UI
+        if (source.notas_humanas && source.notas_humanas.trim() !== '') {
+            const rawNotes = source.notas_humanas.split('\n');
+            const parsedNotes = rawNotes
+                .filter(n => n.trim() !== '')
+                .map((n, idx) => ({ id: Date.now() + idx, text: n.replace('- ', ''), time: 'Previously' }));
+            
+            setChatNotes(parsedNotes);
+        } else {
+            setChatNotes([]);
+        }
+        setIsManageSourceOpen(true);
     };
 
     interface DataSource {
@@ -193,6 +219,7 @@ export const KnowledgeBase: React.FC = () => {
         pages?: number;
         depth?: number;
         timeAgo: string;
+        notas_humanas?: string;
     }
 
     const fetchDocumentsFromN8n = async () => {
@@ -230,7 +257,7 @@ export const KnowledgeBase: React.FC = () => {
     }, [dataSources]);
 
     const handleConfirmSync = () => {
-        if (selectedDocument) {
+        if (selectedDocument && selectedDocument.file) {
             uploadToN8n(selectedDocument.file, selectedDocument.documentId, "");
 
             // Add to UI state
@@ -458,7 +485,7 @@ export const KnowledgeBase: React.FC = () => {
                                             </div>
                                             <div className="flex gap-2">
                                                 <button
-                                                    onClick={() => setIsManageSourceOpen(true)}
+                                                    onClick={() => handleManageSource(source)}
                                                     className={`flex-1 py-3 text-white text-xs font-bold rounded-xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 ${source.type === 'pdf' ? 'bg-primary-500 hover:bg-primary-400 shadow-primary-500/20' : 'bg-[#fab728] hover:bg-[#e6a623] shadow-amber-500/20'}`}
                                                 >
                                                     Manage <ChevronRight size={14} strokeWidth={3} />
@@ -500,7 +527,7 @@ export const KnowledgeBase: React.FC = () => {
                                         </div>
                                         <div className="flex gap-2">
                                             <button
-                                                onClick={() => setIsManageSourceOpen(true)}
+                                                onClick={() => handleManageSource(source)}
                                                 className={`flex-1 py-3 text-white text-xs font-bold rounded-xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 ${source.type === 'pdf' ? 'bg-primary-500 hover:bg-primary-400 shadow-primary-500/20' : 'bg-[#fab728] hover:bg-[#e6a623] shadow-amber-500/20'}`}
                                             >
                                                 Manage <ChevronRight size={14} strokeWidth={3} />
@@ -759,6 +786,9 @@ export const KnowledgeBase: React.FC = () => {
                                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-3 block">{note.time}</span>
                                         <button
                                             onClick={() => {
+                                                const confirmDelete = window.confirm("Are you sure you want to delete this note from the Knowledge Base?");
+                                                if (!confirmDelete) return;
+                                                
                                                 const newNotes = chatNotes.filter(n => n.id !== note.id);
                                                 setChatNotes(newNotes);
                                                 if (selectedDocument) updateNotesInN8n(selectedDocument.documentId, newNotes.map(n => n.text));
