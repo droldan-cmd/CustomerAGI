@@ -39,14 +39,13 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
                 }
 
                 // 2. Forward to N8N using correct form-data construction
+                // CRITICAL: Text fields MUST be appended BEFORE the binary file
+                // so N8N's multipart parser reads them correctly.
                 const form = new FormData();
-                form.append('file', file.buffer, {
-                    filename: file.originalname,
-                    contentType: file.mimetype
-                });
                 form.append('tenant_id', tenant_id);
                 form.append('document_id', document_id);
                 form.append('notas_contexto', notas_contexto || '');
+                form.append('file', file.buffer, file.originalname);
 
                 try {
                     const n8nResponse = await fetch(`${N8N_BASE_URL}/webhook/subir-pdf-mvp`, {
